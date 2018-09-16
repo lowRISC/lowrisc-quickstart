@@ -1,0 +1,1125 @@
+diff -urN linux-4.18/arch/riscv/configs/defconfig riscv-linux-riscv-linux-4.18/arch/riscv/configs/defconfig
+--- linux-4.18/arch/riscv/configs/defconfig	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/configs/defconfig	2018-08-27 17:52:36.000000000 +0100
+@@ -76,3 +76,4 @@
+ CONFIG_CRYPTO_USER_API_HASH=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
++CONFIG_SIFIVE_PLIC=y
+diff -urN linux-4.18/arch/riscv/include/asm/compat.h riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/compat.h
+--- linux-4.18/arch/riscv/include/asm/compat.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/compat.h	1970-01-01 01:00:00.000000000 +0100
+@@ -1,29 +0,0 @@
+-/*
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_COMPAT_H
+-#define __ASM_COMPAT_H
+-#ifdef CONFIG_COMPAT
+-
+-#if defined(CONFIG_64BIT)
+-#define COMPAT_UTS_MACHINE "riscv64\0\0"
+-#elif defined(CONFIG_32BIT)
+-#define COMPAT_UTS_MACHINE "riscv32\0\0"
+-#else
+-#error "Unknown RISC-V base ISA"
+-#endif
+-
+-#endif /*CONFIG_COMPAT*/
+-#endif /*__ASM_COMPAT_H*/
+diff -urN linux-4.18/arch/riscv/include/asm/csr.h riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/csr.h
+--- linux-4.18/arch/riscv/include/asm/csr.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/csr.h	2018-08-27 17:52:36.000000000 +0100
+@@ -54,6 +54,7 @@
+ /* Interrupt Enable and Interrupt Pending flags */
+ #define SIE_SSIE _AC(0x00000002, UL) /* Software Interrupt Enable */
+ #define SIE_STIE _AC(0x00000020, UL) /* Timer Interrupt Enable */
++#define SIE_SEIE _AC(0x00000200, UL) /* External Interrupt Enable */
+ 
+ #define EXC_INST_MISALIGNED     0
+ #define EXC_INST_ACCESS         1
+diff -urN linux-4.18/arch/riscv/include/asm/irq.h riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/irq.h
+--- linux-4.18/arch/riscv/include/asm/irq.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/irq.h	2018-08-27 17:52:36.000000000 +0100
+@@ -17,11 +17,8 @@
+ 
+ #define NR_IRQS         0
+ 
+-#define INTERRUPT_CAUSE_SOFTWARE    1
+-#define INTERRUPT_CAUSE_TIMER       5
+-#define INTERRUPT_CAUSE_EXTERNAL    9
+-
+ void riscv_timer_interrupt(void);
++void riscv_software_interrupt(void);
+ 
+ #include <asm-generic/irq.h>
+ 
+diff -urN linux-4.18/arch/riscv/include/asm/Kbuild riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/Kbuild
+--- linux-4.18/arch/riscv/include/asm/Kbuild	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/Kbuild	2018-08-27 17:52:36.000000000 +0100
+@@ -1,6 +1,7 @@
+ generic-y += bugs.h
+ generic-y += cacheflush.h
+ generic-y += checksum.h
++generic-y += compat.h
+ generic-y += cputime.h
+ generic-y += device.h
+ generic-y += div64.h
+diff -urN linux-4.18/arch/riscv/include/asm/perf_event.h riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/perf_event.h
+--- linux-4.18/arch/riscv/include/asm/perf_event.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/perf_event.h	2018-08-27 17:52:36.000000000 +0100
+@@ -10,6 +10,7 @@
+ 
+ #include <linux/perf_event.h>
+ #include <linux/ptrace.h>
++#include <linux/interrupt.h>
+ 
+ #define RISCV_BASE_COUNTERS	2
+ 
+diff -urN linux-4.18/arch/riscv/include/asm/smp.h riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/smp.h
+--- linux-4.18/arch/riscv/include/asm/smp.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/smp.h	2018-08-27 17:52:36.000000000 +0100
+@@ -25,9 +25,6 @@
+ #ifdef CONFIG_SMP
+ 
+ /* SMP initialization hook for setup_arch */
+-void __init init_clockevent(void);
+-
+-/* SMP initialization hook for setup_arch */
+ void __init setup_smp(void);
+ 
+ /* Hook for the generic smp_call_function_many() routine. */
+@@ -44,9 +41,6 @@
+  */
+ #define raw_smp_processor_id() (*((int*)((char*)get_current() + TASK_TI_CPU)))
+ 
+-/* Interprocessor interrupt handler */
+-irqreturn_t handle_ipi(void);
+-
+ #endif /* CONFIG_SMP */
+ 
+ #endif /* _ASM_RISCV_SMP_H */
+diff -urN linux-4.18/arch/riscv/include/asm/unistd.h riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/unistd.h
+--- linux-4.18/arch/riscv/include/asm/unistd.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/unistd.h	2018-08-27 17:52:36.000000000 +0100
+@@ -11,6 +11,11 @@
+  *   GNU General Public License for more details.
+  */
+ 
++/*
++ * There is explicitly no include guard here because this file is expected to
++ * be included multiple times.  See uapi/asm/syscalls.h for more info.
++ */
++
+ #define __ARCH_WANT_SYS_CLONE
+ #include <uapi/asm/unistd.h>
+ #include <uapi/asm/syscalls.h>
+diff -urN linux-4.18/arch/riscv/include/asm/vdso.h riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/vdso.h
+--- linux-4.18/arch/riscv/include/asm/vdso.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/asm/vdso.h	2018-08-27 17:52:36.000000000 +0100
+@@ -38,8 +38,6 @@
+ 	(void __user *)((unsigned long)(base) + __vdso_##name);			\
+ })
+ 
+-#ifdef CONFIG_SMP
+ asmlinkage long sys_riscv_flush_icache(uintptr_t, uintptr_t, uintptr_t);
+-#endif
+ 
+ #endif /* _ASM_RISCV_VDSO_H */
+diff -urN linux-4.18/arch/riscv/include/uapi/asm/syscalls.h riscv-linux-riscv-linux-4.18/arch/riscv/include/uapi/asm/syscalls.h
+--- linux-4.18/arch/riscv/include/uapi/asm/syscalls.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/include/uapi/asm/syscalls.h	2018-08-27 17:52:36.000000000 +0100
+@@ -1,10 +1,13 @@
+ /* SPDX-License-Identifier: GPL-2.0 */
+ /*
+- * Copyright (C) 2017 SiFive
++ * Copyright (C) 2017-2018 SiFive
+  */
+ 
+-#ifndef _ASM__UAPI__SYSCALLS_H
+-#define _ASM__UAPI__SYSCALLS_H
++/*
++ * There is explicitly no include guard here because this file is expected to
++ * be included multiple times in order to define the syscall macros via
++ * __SYSCALL.
++ */
+ 
+ /*
+  * Allows the instruction cache to be flushed from userspace.  Despite RISC-V
+@@ -20,7 +23,7 @@
+  * caller.  We don't currently do anything with the address range, that's just
+  * in there for forwards compatibility.
+  */
++#ifndef __NR_riscv_flush_icache
+ #define __NR_riscv_flush_icache (__NR_arch_specific_syscall + 15)
+-__SYSCALL(__NR_riscv_flush_icache, sys_riscv_flush_icache)
+-
+ #endif
++__SYSCALL(__NR_riscv_flush_icache, sys_riscv_flush_icache)
+diff -urN linux-4.18/arch/riscv/kernel/entry.S riscv-linux-riscv-linux-4.18/arch/riscv/kernel/entry.S
+--- linux-4.18/arch/riscv/kernel/entry.S	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/entry.S	2018-08-27 17:52:36.000000000 +0100
+@@ -168,8 +168,8 @@
+ 
+ 	/* Handle interrupts */
+ 	move a0, sp /* pt_regs */
+-	REG_L a1, handle_arch_irq
+-	jr a1
++	move a1, s4 /* scause */
++	tail do_IRQ
+ 1:
+ 	/* Exceptions run with interrupts enabled */
+ 	csrs sstatus, SR_SIE
+diff -urN linux-4.18/arch/riscv/kernel/head.S riscv-linux-riscv-linux-4.18/arch/riscv/kernel/head.S
+--- linux-4.18/arch/riscv/kernel/head.S	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/head.S	2018-08-27 17:52:36.000000000 +0100
+@@ -94,6 +94,7 @@
+ 	or a0, a0, a1
+ 	sfence.vma
+ 	csrw sptbr, a0
++.align 2
+ 1:
+ 	/* Set trap vector to spin forever to help debug */
+ 	la a0, .Lsecondary_park
+@@ -143,6 +144,7 @@
+ 	tail smp_callin
+ #endif
+ 
++.align 2
+ .Lsecondary_park:
+ 	/* We lack SMP support or have too many harts, so park this hart */
+ 	wfi
+diff -urN linux-4.18/arch/riscv/kernel/irq.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/irq.c
+--- linux-4.18/arch/riscv/kernel/irq.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/irq.c	2018-08-27 17:52:36.000000000 +0100
+@@ -1,21 +1,58 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (C) 2012 Regents of the University of California
+  * Copyright (C) 2017 SiFive
+- *
+- *   This program is free software; you can redistribute it and/or
+- *   modify it under the terms of the GNU General Public License
+- *   as published by the Free Software Foundation, version 2.
+- *
+- *   This program is distributed in the hope that it will be useful,
+- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *   GNU General Public License for more details.
++ * Copyright (C) 2018 Christoph Hellwig
+  */
+ 
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/irqdomain.h>
+ 
++/*
++ * Possible interrupt causes:
++ */
++#define INTERRUPT_CAUSE_SOFTWARE    1
++#define INTERRUPT_CAUSE_TIMER       5
++#define INTERRUPT_CAUSE_EXTERNAL    9
++
++/*
++ * The high order bit of the trap cause register is always set for
++ * interrupts, which allows us to differentiate them from exceptions
++ * quickly.  The INTERRUPT_CAUSE_* macros don't contain that bit, so we
++ * need to mask it off.
++ */
++#define INTERRUPT_CAUSE_FLAG	(1UL << (__riscv_xlen - 1))
++
++asmlinkage void __irq_entry do_IRQ(struct pt_regs *regs, unsigned long cause)
++{
++	struct pt_regs *old_regs = set_irq_regs(regs);
++
++	irq_enter();
++	switch (cause & ~INTERRUPT_CAUSE_FLAG) {
++	case INTERRUPT_CAUSE_TIMER:
++		riscv_timer_interrupt();
++		break;
++#ifdef CONFIG_SMP
++	case INTERRUPT_CAUSE_SOFTWARE:
++		/*
++		 * We only use software interrupts to pass IPIs, so if a non-SMP
++		 * system gets one, then we don't know what to do.
++		 */
++		riscv_software_interrupt();
++		break;
++#endif
++	case INTERRUPT_CAUSE_EXTERNAL:
++		handle_arch_irq(regs);
++		break;
++	default:
++		panic("unexpected interrupt cause");
++	}
++	irq_exit();
++
++	set_irq_regs(old_regs);
++}
++
+ void __init init_IRQ(void)
+ {
+ 	irqchip_init();
+diff -urN linux-4.18/arch/riscv/kernel/perf_event.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/perf_event.c
+--- linux-4.18/arch/riscv/kernel/perf_event.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/perf_event.c	2018-08-27 17:52:36.000000000 +0100
+@@ -27,7 +27,6 @@
+ #include <linux/mutex.h>
+ #include <linux/bitmap.h>
+ #include <linux/irq.h>
+-#include <linux/interrupt.h>
+ #include <linux/perf_event.h>
+ #include <linux/atomic.h>
+ #include <linux/of.h>
+diff -urN linux-4.18/arch/riscv/kernel/setup.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/setup.c
+--- linux-4.18/arch/riscv/kernel/setup.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/setup.c	2018-08-27 17:52:36.000000000 +0100
+@@ -39,6 +39,27 @@
+ #include <asm/tlbflush.h>
+ #include <asm/thread_info.h>
+ 
++#ifdef CONFIG_EARLY_PRINTK
++static void sbi_console_write(struct console *co, const char *buf,
++			      unsigned int n)
++{
++	int i;
++
++	for (i = 0; i < n; ++i) {
++		if (buf[i] == '\n')
++			sbi_console_putchar('\r');
++		sbi_console_putchar(buf[i]);
++	}
++}
++
++struct console riscv_sbi_early_console_dev __initdata = {
++	.name	= "early",
++	.write	= sbi_console_write,
++	.flags	= CON_PRINTBUFFER | CON_BOOT | CON_ANYTIME,
++	.index	= -1
++};
++#endif
++
+ #ifdef CONFIG_DUMMY_CONSOLE
+ struct screen_info screen_info = {
+ 	.orig_video_lines	= 30,
+@@ -195,6 +216,12 @@
+ 
+ void __init setup_arch(char **cmdline_p)
+ {
++#if defined(CONFIG_EARLY_PRINTK)
++       if (likely(early_console == NULL)) {
++               early_console = &riscv_sbi_early_console_dev;
++               register_console(early_console);
++       }
++#endif
+ 	*cmdline_p = boot_command_line;
+ 
+ 	parse_early_param();
+diff -urN linux-4.18/arch/riscv/kernel/smpboot.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/smpboot.c
+--- linux-4.18/arch/riscv/kernel/smpboot.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/smpboot.c	2018-08-27 17:52:36.000000000 +0100
+@@ -104,7 +104,6 @@
+ 	current->active_mm = mm;
+ 
+ 	trap_init();
+-	init_clockevent();
+ 	notify_cpu_starting(smp_processor_id());
+ 	set_cpu_online(smp_processor_id(), 1);
+ 	local_flush_tlb_all();
+diff -urN linux-4.18/arch/riscv/kernel/smp.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/smp.c
+--- linux-4.18/arch/riscv/kernel/smp.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/smp.c	2018-08-27 17:52:36.000000000 +0100
+@@ -45,7 +45,7 @@
+ 	return -EINVAL;
+ }
+ 
+-irqreturn_t handle_ipi(void)
++void riscv_software_interrupt(void)
+ {
+ 	unsigned long *pending_ipis = &ipi_data[smp_processor_id()].bits;
+ 
+@@ -60,7 +60,7 @@
+ 
+ 		ops = xchg(pending_ipis, 0);
+ 		if (ops == 0)
+-			return IRQ_HANDLED;
++			return;
+ 
+ 		if (ops & (1 << IPI_RESCHEDULE))
+ 			scheduler_ipi();
+@@ -73,8 +73,6 @@
+ 		/* Order data access and bit testing. */
+ 		mb();
+ 	}
+-
+-	return IRQ_HANDLED;
+ }
+ 
+ static void
+diff -urN linux-4.18/arch/riscv/kernel/sys_riscv.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/sys_riscv.c
+--- linux-4.18/arch/riscv/kernel/sys_riscv.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/sys_riscv.c	2018-08-27 17:52:36.000000000 +0100
+@@ -48,7 +48,6 @@
+ }
+ #endif /* !CONFIG_64BIT */
+ 
+-#ifdef CONFIG_SMP
+ /*
+  * Allows the instruction cache to be flushed from userspace.  Despite RISC-V
+  * having a direct 'fence.i' instruction available to userspace (which we
+@@ -66,15 +65,24 @@
+ SYSCALL_DEFINE3(riscv_flush_icache, uintptr_t, start, uintptr_t, end,
+ 	uintptr_t, flags)
+ {
++#ifdef CONFIG_SMP
+ 	struct mm_struct *mm = current->mm;
+ 	bool local = (flags & SYS_RISCV_FLUSH_ICACHE_LOCAL) != 0;
++#endif
+ 
+ 	/* Check the reserved flags. */
+ 	if (unlikely(flags & ~SYS_RISCV_FLUSH_ICACHE_ALL))
+ 		return -EINVAL;
+ 
++	/*
++	 * Without CONFIG_SMP flush_icache_mm is a just a flush_icache_all(),
++	 * which generates unused variable warnings all over this function.
++	 */
++#ifdef CONFIG_SMP
+ 	flush_icache_mm(mm, local);
++#else
++	flush_icache_all();
++#endif
+ 
+ 	return 0;
+ }
+-#endif
+diff -urN linux-4.18/arch/riscv/kernel/time.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/time.c
+--- linux-4.18/arch/riscv/kernel/time.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/time.c	2018-08-27 17:52:36.000000000 +0100
+@@ -13,38 +13,11 @@
+  */
+ 
+ #include <linux/clocksource.h>
+-#include <linux/clockchips.h>
+ #include <linux/delay.h>
+-
+-#ifdef CONFIG_RISCV_TIMER
+-#include <linux/timer_riscv.h>
+-#endif
+-
+ #include <asm/sbi.h>
+ 
+ unsigned long riscv_timebase;
+ 
+-DECLARE_PER_CPU(struct clock_event_device, riscv_clock_event);
+-
+-void riscv_timer_interrupt(void)
+-{
+-#ifdef CONFIG_RISCV_TIMER
+-	/*
+-	 * FIXME: This needs to be cleaned up along with the rest of the IRQ
+-	 * handling cleanup.  See irq.c for more details.
+-	 */
+-	struct clock_event_device *evdev = this_cpu_ptr(&riscv_clock_event);
+-
+-	evdev->event_handler(evdev);
+-#endif
+-}
+-
+-void __init init_clockevent(void)
+-{
+-	timer_probe();
+-	csr_set(sie, SIE_STIE);
+-}
+-
+ void __init time_init(void)
+ {
+ 	struct device_node *cpu;
+@@ -56,6 +29,5 @@
+ 	riscv_timebase = prop;
+ 
+ 	lpj_fine = riscv_timebase / HZ;
+-
+-	init_clockevent();
++	timer_probe();
+ }
+diff -urN linux-4.18/arch/riscv/kernel/traps.c riscv-linux-riscv-linux-4.18/arch/riscv/kernel/traps.c
+--- linux-4.18/arch/riscv/kernel/traps.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/traps.c	2018-08-27 17:52:36.000000000 +0100
+@@ -138,7 +138,6 @@
+ #endif /* CONFIG_GENERIC_BUG */
+ 
+ 	force_sig_fault(SIGTRAP, TRAP_BRKPT, (void __user *)(regs->sepc), current);
+-	regs->sepc += 0x4;
+ }
+ 
+ #ifdef CONFIG_GENERIC_BUG
+diff -urN linux-4.18/arch/riscv/kernel/vdso/Makefile riscv-linux-riscv-linux-4.18/arch/riscv/kernel/vdso/Makefile
+--- linux-4.18/arch/riscv/kernel/vdso/Makefile	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/kernel/vdso/Makefile	2018-08-27 17:52:36.000000000 +0100
+@@ -52,8 +52,8 @@
+ # Add -lgcc so rv32 gets static muldi3 and lshrdi3 definitions.
+ # Make sure only to export the intended __vdso_xxx symbol offsets.
+ quiet_cmd_vdsold = VDSOLD  $@
+-      cmd_vdsold = $(CC) $(KCFLAGS) $(call cc-option, -no-pie) -nostdlib $(SYSCFLAGS_$(@F)) \
+-                           -Wl,-T,$(filter-out FORCE,$^) -o $@.tmp -lgcc && \
++      cmd_vdsold = $(CC) $(KBUILD_CFLAGS) $(call cc-option, -no-pie) -nostdlib -nostartfiles $(SYSCFLAGS_$(@F)) \
++                           -Wl,-T,$(filter-out FORCE,$^) -o $@.tmp && \
+                    $(CROSS_COMPILE)objcopy \
+                            $(patsubst %, -G __vdso_%, $(vdso-syms)) $@.tmp $@
+ 
+diff -urN linux-4.18/arch/riscv/lib/Makefile riscv-linux-riscv-linux-4.18/arch/riscv/lib/Makefile
+--- linux-4.18/arch/riscv/lib/Makefile	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/lib/Makefile	2018-08-27 17:52:36.000000000 +0100
+@@ -2,5 +2,6 @@
+ lib-y	+= memcpy.o
+ lib-y	+= memset.o
+ lib-y	+= uaccess.o
++lib-y	+= tishift.o
+ 
+ lib-$(CONFIG_32BIT) += udivdi3.o
+diff -urN linux-4.18/arch/riscv/lib/tishift.S riscv-linux-riscv-linux-4.18/arch/riscv/lib/tishift.S
+--- linux-4.18/arch/riscv/lib/tishift.S	1970-01-01 01:00:00.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/lib/tishift.S	2018-08-27 17:52:36.000000000 +0100
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2018 Free Software Foundation, Inc.
++ *
++ *   This program is free software; you can redistribute it and/or
++ *   modify it under the terms of the GNU General Public License
++ *   as published by the Free Software Foundation, version 2.
++ *
++ *   This program is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU General Public License for more details.
++ */
++  .globl __lshrti3
++__lshrti3:
++  beqz  a2, .L1
++  li    a5,64
++  sub   a5,a5,a2
++  addi  sp,sp,-16
++  sext.w a4,a5
++  blez  a5, .L2
++  sext.w a2,a2
++  sll   a4,a1,a4
++  srl   a0,a0,a2
++  srl   a1,a1,a2
++  or    a0,a0,a4
++  sd    a1,8(sp)
++  sd    a0,0(sp)
++  ld    a0,0(sp)
++  ld    a1,8(sp)
++  addi  sp,sp,16
++  ret
++.L1:
++  ret
++.L2:
++  negw  a4,a4
++  srl   a1,a1,a4
++  sd    a1,0(sp)
++  sd    zero,8(sp)
++  ld    a0,0(sp)
++  ld    a1,8(sp)
++  addi  sp,sp,16
++  ret
+diff -urN linux-4.18/arch/riscv/Makefile riscv-linux-riscv-linux-4.18/arch/riscv/Makefile
+--- linux-4.18/arch/riscv/Makefile	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/arch/riscv/Makefile	2018-08-27 17:52:36.000000000 +0100
+@@ -26,6 +26,9 @@
+ 
+ 	KBUILD_CFLAGS += -mabi=lp64
+ 	KBUILD_AFLAGS += -mabi=lp64
++	
++	KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
++
+ 	KBUILD_MARCH = rv64im
+ 	LDFLAGS += -melf64lriscv
+ else
+diff -urN linux-4.18/Documentation/devicetree/bindings/interrupt-controller/riscv,cpu-intc.txt riscv-linux-riscv-linux-4.18/Documentation/devicetree/bindings/interrupt-controller/riscv,cpu-intc.txt
+--- linux-4.18/Documentation/devicetree/bindings/interrupt-controller/riscv,cpu-intc.txt	1970-01-01 01:00:00.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/Documentation/devicetree/bindings/interrupt-controller/riscv,cpu-intc.txt	2018-08-27 17:52:36.000000000 +0100
+@@ -0,0 +1,44 @@
++RISC-V Hart-Level Interrupt Controller (HLIC)
++---------------------------------------------
++
++RISC-V cores include Control Status Registers (CSRs) which are local to each
++CPU core (HART in RISC-V terminology) and can be read or written by software.
++Some of these CSRs are used to control local interrupts connected to the core.
++Every interrupt is ultimately routed through a hart's HLIC before it
++interrupts that hart.
++
++The RISC-V supervisor ISA manual specifies three interrupt sources that are
++attached to every HLIC: software interrupts, the timer interrupt, and external
++interrupts.  Software interrupts are used to send IPIs between cores.  The
++timer interrupt comes from an architecturally mandated real-time timer that is
++controller via Supervisor Binary Interface (SBI) calls and CSR reads.  External
++interrupts connect all other device interrupts to the HLIC, which are routed
++via the platform-level interrupt controller (PLIC).
++
++All RISC-V systems that conform to the supervisor ISA specification are
++required to have a HLIC with these three interrupt sources present.  Since the
++interrupt map is defined by the ISA it's not listed in the HLIC's device tree
++entry, though external interrupt controllers (like the PLIC, for example) will
++need to define how their interrupts map to the relevant HLICs.  This means
++a PLIC interrupt property will typically list the HLICs for all present HARTs
++in the system.
++
++Required properties:
++- compatible : "riscv,cpu-intc"
++- #interrupt-cells : should be <1>
++- interrupt-controller : Identifies the node as an interrupt controller
++
++Furthermore, this interrupt-controller MUST be embedded inside the cpu
++definition of the hart whose CSRs control these local interrupts.
++
++An example device tree entry for a HLIC is show below.
++
++	cpu1: cpu@1 {
++		compatible = "riscv";
++		...
++		cpu1-intc: interrupt-controller {
++			#interrupt-cells = <1>;
++			compatible = "riscv,cpu-intc", "sifive,fu540-c000-cpu-intc";
++			interrupt-controller;
++		};
++	};
+diff -urN linux-4.18/Documentation/devicetree/bindings/interrupt-controller/sifive,plic-1.0.0.txt riscv-linux-riscv-linux-4.18/Documentation/devicetree/bindings/interrupt-controller/sifive,plic-1.0.0.txt
+--- linux-4.18/Documentation/devicetree/bindings/interrupt-controller/sifive,plic-1.0.0.txt	1970-01-01 01:00:00.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/Documentation/devicetree/bindings/interrupt-controller/sifive,plic-1.0.0.txt	2018-08-27 17:52:36.000000000 +0100
+@@ -0,0 +1,58 @@
++SiFive Platform-Level Interrupt Controller (PLIC)
++-------------------------------------------------
++
++SiFive SOCs include an implementation of the Platform-Level Interrupt Controller
++(PLIC) high-level specification in the RISC-V Privileged Architecture
++specification.  The PLIC connects all external interrupts in the system to all
++hart contexts in the system, via the external interrupt source in each hart.
++
++A hart context is a privilege mode in a hardware execution thread.  For example,
++in an 4 core system with 2-way SMT, you have 8 harts and probably at least two
++privilege modes per hart; machine mode and supervisor mode.
++
++Each interrupt can be enabled on per-context basis.  Any context can claim
++a pending enabled interrupt and then release it once it has been handled.
++
++Each interrupt has a configurable priority.  Higher priority interrupts are
++serviced first.  Each context can specify a priority threshold. Interrupts
++with priority below this threshold will not cause the PLIC to raise its
++interrupt line leading to the context.
++
++While the PLIC supports both edge-triggered and level-triggered interrupts,
++interrupt handlers are oblivious to this distinction and therefore it is not
++specified in the PLIC device-tree binding.
++
++While the RISC-V ISA doesn't specify a memory layout for the PLIC, the
++"sifive,plic-1.0.0" device is a concrete implementation of the PLIC that
++contains a specific memory layout, which is documented in chapter 8 of the
++SiFive U5 Coreplex Series Manual <https://static.dev.sifive.com/U54-MC-RVCoreIP.pdf>.
++
++Required properties:
++- compatible : "sifive,plic-1.0.0" and a string identifying the actual
++  detailed implementation in case that specific bugs need to be worked around.
++- #address-cells : should be <0> or more.
++- #interrupt-cells : should be <1> or more.
++- interrupt-controller : Identifies the node as an interrupt controller.
++- reg : Should contain 1 register range (address and length).
++- interrupts-extended : Specifies which contexts are connected to the PLIC,
++  with "-1" specifying that a context is not present.  Each node pointed
++  to should be a riscv,cpu-intc node, which has a riscv node as parent.
++- riscv,ndev: Specifies how many external interrupts are supported by
++  this controller.
++
++Example:
++
++	plic: interrupt-controller@c000000 {
++		#address-cells = <0>;
++		#interrupt-cells = <1>;
++		compatible = "sifive,plic-1.0.0", "sifive,fu540-c000-plic";
++		interrupt-controller;
++		interrupts-extended = <
++			&cpu0-intc 11
++			&cpu1-intc 11 &cpu1-intc 9
++			&cpu2-intc 11 &cpu2-intc 9
++			&cpu3-intc 11 &cpu3-intc 9
++			&cpu4-intc 11 &cpu4-intc 9>;
++		reg = <0xc000000 0x4000000>;
++		riscv,ndev = <10>;
++	};
+diff -urN linux-4.18/drivers/base/init.c riscv-linux-riscv-linux-4.18/drivers/base/init.c
+--- linux-4.18/drivers/base/init.c	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/base/init.c	2018-08-27 17:52:36.000000000 +0100
+@@ -30,9 +30,9 @@
+ 	/* These are also core pieces, but must come after the
+ 	 * core core pieces.
+ 	 */
++	of_core_init();
+ 	platform_bus_init();
+ 	cpu_dev_init();
+ 	memory_dev_init();
+ 	container_dev_init();
+-	of_core_init();
+ }
+diff -urN linux-4.18/drivers/clocksource/Kconfig riscv-linux-riscv-linux-4.18/drivers/clocksource/Kconfig
+--- linux-4.18/drivers/clocksource/Kconfig	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/clocksource/Kconfig	2018-08-27 17:52:36.000000000 +0100
+@@ -609,4 +609,15 @@
+ 	help
+ 	  This option enables support for the Andestech ATCPIT100 timers.
+ 
++config RISCV_TIMER
++	bool "Timer for the RISC-V platform"
++	depends on RISCV
++	default y
++	select TIMER_PROBE
++	select TIMER_OF
++	help
++	  This enables the per-hart timer built into all RISC-V systems, which
++	  is accessed via both the SBI and the rdcycle instruction.  This is
++	  required for all RISC-V systems.
++
+ endmenu
+diff -urN linux-4.18/drivers/clocksource/Makefile riscv-linux-riscv-linux-4.18/drivers/clocksource/Makefile
+--- linux-4.18/drivers/clocksource/Makefile	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/clocksource/Makefile	2018-08-27 17:52:36.000000000 +0100
+@@ -78,3 +78,4 @@
+ obj-$(CONFIG_CLKSRC_ST_LPC)		+= clksrc_st_lpc.o
+ obj-$(CONFIG_X86_NUMACHIP)		+= numachip.o
+ obj-$(CONFIG_ATCPIT100_TIMER)		+= timer-atcpit100.o
++obj-$(CONFIG_RISCV_TIMER)		+= riscv_timer.o
+diff -urN linux-4.18/drivers/clocksource/riscv_timer.c riscv-linux-riscv-linux-4.18/drivers/clocksource/riscv_timer.c
+--- linux-4.18/drivers/clocksource/riscv_timer.c	1970-01-01 01:00:00.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/clocksource/riscv_timer.c	2018-08-27 17:52:36.000000000 +0100
+@@ -0,0 +1,105 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2012 Regents of the University of California
++ * Copyright (C) 2017 SiFive
++ */
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
++#include <linux/cpu.h>
++#include <linux/delay.h>
++#include <linux/irq.h>
++#include <asm/sbi.h>
++
++/*
++ * All RISC-V systems have a timer attached to every hart.  These timers can be
++ * read by the 'rdcycle' pseudo instruction, and can use the SBI to setup
++ * events.  In order to abstract the architecture-specific timer reading and
++ * setting functions away from the clock event insertion code, we provide
++ * function pointers to the clockevent subsystem that perform two basic
++ * operations: rdtime() reads the timer on the current CPU, and
++ * next_event(delta) sets the next timer event to 'delta' cycles in the future.
++ * As the timers are inherently a per-cpu resource, these callbacks perform
++ * operations on the current hart.  There is guaranteed to be exactly one timer
++ * per hart on all RISC-V systems.
++ */
++
++static int riscv_clock_next_event(unsigned long delta,
++		struct clock_event_device *ce)
++{
++	csr_set(sie, SIE_STIE);
++	sbi_set_timer(get_cycles64() + delta);
++	return 0;
++}
++
++static DEFINE_PER_CPU(struct clock_event_device, riscv_clock_event) = {
++	.name			= "riscv_timer_clockevent",
++	.features		= CLOCK_EVT_FEAT_ONESHOT,
++	.rating			= 100,
++	.set_next_event		= riscv_clock_next_event,
++};
++
++/*
++ * It is guaranteed that all the timers across all the harts are synchronized
++ * within one tick of each other, so while this could technically go
++ * backwards when hopping between CPUs, practically it won't happen.
++ */
++static unsigned long long riscv_clocksource_rdtime(struct clocksource *cs)
++{
++	return get_cycles64();
++}
++
++static DEFINE_PER_CPU(struct clocksource, riscv_clocksource) = {
++	.name		= "riscv_clocksource",
++	.rating		= 300,
++	.mask		= CLOCKSOURCE_MASK(BITS_PER_LONG),
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++	.read		= riscv_clocksource_rdtime,
++};
++
++static int riscv_timer_starting_cpu(unsigned int cpu)
++{
++	struct clock_event_device *ce = per_cpu_ptr(&riscv_clock_event, cpu);
++
++	ce->cpumask = cpumask_of(cpu);
++	clockevents_config_and_register(ce, riscv_timebase, 100, 0x7fffffff);
++
++	csr_set(sie, SIE_STIE);
++	return 0;
++}
++
++static int riscv_timer_dying_cpu(unsigned int cpu)
++{
++	csr_clear(sie, SIE_STIE);
++	return 0;
++}
++
++/* called directly from the low-level interrupt handler */
++void riscv_timer_interrupt(void)
++{
++	struct clock_event_device *evdev = this_cpu_ptr(&riscv_clock_event);
++
++	csr_clear(sie, SIE_STIE);
++	evdev->event_handler(evdev);
++}
++
++static int __init riscv_timer_init_dt(struct device_node *n)
++{
++	int cpu_id = riscv_of_processor_hart(n), error;
++	struct clocksource *cs;
++
++	if (cpu_id != smp_processor_id())
++		return 0;
++
++	cs = per_cpu_ptr(&riscv_clocksource, cpu_id);
++	clocksource_register_hz(cs, riscv_timebase);
++
++	error = cpuhp_setup_state(CPUHP_AP_RISCV_TIMER_STARTING,
++			 "clockevents/riscv/timer:starting",
++			 riscv_timer_starting_cpu, riscv_timer_dying_cpu);
++	if (error)
++		pr_err("RISCV timer register failed [%d] for cpu = [%d]\n",
++		       error, cpu_id);
++	return error;
++}
++
++TIMER_OF_DECLARE(riscv_timer, "riscv", riscv_timer_init_dt);
+diff -urN linux-4.18/drivers/irqchip/irq-sifive-plic.c riscv-linux-riscv-linux-4.18/drivers/irqchip/irq-sifive-plic.c
+--- linux-4.18/drivers/irqchip/irq-sifive-plic.c	1970-01-01 01:00:00.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/irqchip/irq-sifive-plic.c	2018-08-27 17:52:36.000000000 +0100
+@@ -0,0 +1,260 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2017 SiFive
++ * Copyright (C) 2018 Christoph Hellwig
++ */
++#define pr_fmt(fmt) "plic: " fmt
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++
++/*
++ * This driver implements a version of the RISC-V PLIC with the actual layout
++ * specified in chapter 8 of the SiFive U5 Coreplex Series Manual:
++ *
++ *     https://static.dev.sifive.com/U54-MC-RVCoreIP.pdf
++ *
++ * The largest number supported by devices marked as 'sifive,plic-1.0.0', is
++ * 1024, of which device 0 is defined as non-existent by the RISC-V Privileged
++ * Spec.
++ */
++
++#define MAX_DEVICES			1024
++#define MAX_CONTEXTS			15872
++
++/*
++ * Each interrupt source has a priority register associated with it.
++ * We always hardwire it to one in Linux.
++ */
++#define PRIORITY_BASE			0
++#define     PRIORITY_PER_ID		4
++
++/*
++ * Each hart context has a vector of interrupt enable bits associated with it.
++ * There's one bit for each interrupt source.
++ */
++#define ENABLE_BASE			0x2000
++#define     ENABLE_PER_HART		0x80
++
++/*
++ * Each hart context has a set of control registers associated with it.  Right
++ * now there's only two: a source priority threshold over which the hart will
++ * take an interrupt, and a register to claim interrupts.
++ */
++#define CONTEXT_BASE			0x200000
++#define     CONTEXT_PER_HART		0x1000
++#define     CONTEXT_THRESHOLD		0x00
++#define     CONTEXT_CLAIM		0x04
++
++static void __iomem *plic_regs;
++
++struct plic_handler {
++	bool			present;
++	int			ctxid;
++};
++static DEFINE_PER_CPU(struct plic_handler, plic_handlers);
++
++static inline void __iomem *plic_hart_offset(int ctxid)
++{
++	return plic_regs + CONTEXT_BASE + ctxid * CONTEXT_PER_HART;
++}
++
++static inline u32 __iomem *plic_enable_base(int ctxid)
++{
++	return plic_regs + ENABLE_BASE + ctxid * ENABLE_PER_HART;
++}
++
++/*
++ * Protect mask operations on the registers given that we can't assume that
++ * atomic memory operations work on them.
++ */
++static DEFINE_RAW_SPINLOCK(plic_toggle_lock);
++
++static inline void plic_toggle(int ctxid, int hwirq, int enable)
++{
++	u32 __iomem *reg = plic_enable_base(ctxid) + (hwirq / 32);
++	u32 hwirq_mask = 1 << (hwirq % 32);
++
++	raw_spin_lock(&plic_toggle_lock);
++	if (enable)
++		writel(readl(reg) | hwirq_mask, reg);
++	else
++		writel(readl(reg) & ~hwirq_mask, reg);
++	raw_spin_unlock(&plic_toggle_lock);
++}
++
++static inline void plic_irq_toggle(struct irq_data *d, int enable)
++{
++	int cpu;
++
++	writel(enable, plic_regs + PRIORITY_BASE + d->hwirq * PRIORITY_PER_ID);
++	for_each_cpu(cpu, irq_data_get_affinity_mask(d)) {
++		struct plic_handler *handler = per_cpu_ptr(&plic_handlers, cpu);
++
++		if (handler->present)
++			plic_toggle(handler->ctxid, d->hwirq, enable);
++	}
++}
++
++static void plic_irq_enable(struct irq_data *d)
++{
++	plic_irq_toggle(d, 1);
++}
++
++static void plic_irq_disable(struct irq_data *d)
++{
++	plic_irq_toggle(d, 0);
++}
++
++static struct irq_chip plic_chip = {
++	.name		= "SiFive PLIC",
++	/*
++	 * There is no need to mask/unmask PLIC interrupts.  They are "masked"
++	 * by reading claim and "unmasked" when writing it back.
++	 */
++	.irq_enable	= plic_irq_enable,
++	.irq_disable	= plic_irq_disable,
++};
++
++static int plic_irqdomain_map(struct irq_domain *d, unsigned int irq,
++			      irq_hw_number_t hwirq)
++{
++	irq_set_chip_and_handler(irq, &plic_chip, handle_simple_irq);
++	irq_set_chip_data(irq, NULL);
++	irq_set_noprobe(irq);
++	return 0;
++}
++
++static const struct irq_domain_ops plic_irqdomain_ops = {
++	.map		= plic_irqdomain_map,
++	.xlate		= irq_domain_xlate_onecell,
++};
++
++static struct irq_domain *plic_irqdomain;
++
++/*
++ * Handling an interrupt is a two-step process: first you claim the interrupt
++ * by reading the claim register, then you complete the interrupt by writing
++ * that source ID back to the same claim register.  This automatically enables
++ * and disables the interrupt, so there's nothing else to do.
++ */
++static void plic_handle_irq(struct pt_regs *regs)
++{
++	struct plic_handler *handler = this_cpu_ptr(&plic_handlers);
++	void __iomem *claim = plic_hart_offset(handler->ctxid) + CONTEXT_CLAIM;
++	irq_hw_number_t hwirq;
++
++	WARN_ON_ONCE(!handler->present);
++
++	csr_clear(sie, SIE_SEIE);
++	while ((hwirq = readl(claim))) {
++		int irq = irq_find_mapping(plic_irqdomain, hwirq);
++
++		if (unlikely(irq <= 0))
++			pr_warn_ratelimited("can't find mapping for hwirq %lu\n",
++					hwirq);
++		else
++			generic_handle_irq(irq);
++		writel(hwirq, claim);
++	}
++	csr_set(sie, SIE_SEIE);
++}
++
++/*
++ * Walk up the DT tree until we find an active RISC-V core (HART) node and
++ * extract the cpuid from it.
++ */
++static int plic_find_hart_id(struct device_node *node)
++{
++	for (; node; node = node->parent) {
++		if (of_device_is_compatible(node, "riscv"))
++			return riscv_of_processor_hart(node);
++	}
++
++	return -1;
++}
++
++static int __init plic_init(struct device_node *node,
++		struct device_node *parent)
++{
++	int error = 0, nr_handlers, nr_mapped = 0, i;
++	u32 nr_irqs;
++
++	if (plic_regs) {
++		pr_warn("PLIC already present.\n");
++		return -ENXIO;
++	}
++
++	plic_regs = of_iomap(node, 0);
++	if (WARN_ON(!plic_regs))
++		return -EIO;
++
++	error = -EINVAL;
++	of_property_read_u32(node, "riscv,ndev", &nr_irqs);
++	if (WARN_ON(!nr_irqs))
++		goto out_iounmap;
++
++	nr_handlers = of_irq_count(node);
++	if (WARN_ON(!nr_handlers))
++		goto out_iounmap;
++	if (WARN_ON(nr_handlers < num_possible_cpus()))
++		goto out_iounmap;
++
++	error = -ENOMEM;
++	plic_irqdomain = irq_domain_add_linear(node, nr_irqs + 1,
++			&plic_irqdomain_ops, NULL);
++	if (WARN_ON(!plic_irqdomain))
++		goto out_iounmap;
++
++	for (i = 0; i < nr_handlers; i++) {
++		struct of_phandle_args parent;
++		struct plic_handler *handler;
++		irq_hw_number_t hwirq;
++		int cpu;
++
++		if (of_irq_parse_one(node, i, &parent)) {
++			pr_err("failed to parse parent for context %d.\n", i);
++			continue;
++		}
++
++		/* skip context holes */
++		if (parent.args[0] == -1)
++			continue;
++
++		cpu = plic_find_hart_id(parent.np);
++		if (cpu < 0) {
++			pr_warn("failed to parse hart ID for context %d.\n", i);
++			continue;
++		}
++
++		handler = per_cpu_ptr(&plic_handlers, cpu);
++		handler->present = true;
++		handler->ctxid = i;
++
++		/* priority must be > threshold to trigger an interrupt */
++		writel(0, plic_hart_offset(i) + CONTEXT_THRESHOLD);
++		for (hwirq = 1; hwirq <= nr_irqs; hwirq++)
++			plic_toggle(i, hwirq, 0);
++		nr_mapped++;
++	}
++
++	pr_info("mapped %d interrupts to %d (out of %d) handlers.\n",
++		nr_irqs, nr_mapped, nr_handlers);
++	set_handle_irq(plic_handle_irq);
++	return 0;
++
++out_iounmap:
++	iounmap(plic_regs);
++	return error;
++}
++
++IRQCHIP_DECLARE(sifive_plic, "sifive,plic-1.0.0", plic_init);
++IRQCHIP_DECLARE(riscv_plic0, "riscv,plic0", plic_init); /* for legacy systems */
+diff -urN linux-4.18/drivers/irqchip/Kconfig riscv-linux-riscv-linux-4.18/drivers/irqchip/Kconfig
+--- linux-4.18/drivers/irqchip/Kconfig	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/irqchip/Kconfig	2018-08-27 17:52:36.000000000 +0100
+@@ -372,3 +372,15 @@
+ 	  IRQs for Qualcomm Technologies Inc (QTI) mobile chips.
+ 
+ endmenu
++
++config SIFIVE_PLIC
++	bool "SiFive Platform-Level Interrupt Controller"
++	depends on RISCV
++	help
++	   This enables support for the PLIC chip found in SiFive (and
++	   potentially other) RISC-V systems.  The PLIC controls devices
++	   interrupts and connects them to each core's local interrupt
++	   controller.  Aside from timer and software interrupts, all other
++	   interrupt sources are subordinate to the PLIC.
++
++	   If you don't know what to do here, say Y.
+diff -urN linux-4.18/drivers/irqchip/Makefile riscv-linux-riscv-linux-4.18/drivers/irqchip/Makefile
+--- linux-4.18/drivers/irqchip/Makefile	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/irqchip/Makefile	2018-08-27 17:52:36.000000000 +0100
+@@ -87,3 +87,4 @@
+ obj-$(CONFIG_GOLDFISH_PIC) 		+= irq-goldfish-pic.o
+ obj-$(CONFIG_NDS32)			+= irq-ativic32.o
+ obj-$(CONFIG_QCOM_PDC)			+= qcom-pdc.o
++obj-$(CONFIG_SIFIVE_PLIC)		+= irq-sifive-plic.o
+diff -urN linux-4.18/drivers/pci/controller/Kconfig riscv-linux-riscv-linux-4.18/drivers/pci/controller/Kconfig
+--- linux-4.18/drivers/pci/controller/Kconfig	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/drivers/pci/controller/Kconfig	2018-08-27 17:52:36.000000000 +0100
+@@ -102,7 +102,7 @@
+ 
+ config PCIE_XILINX
+ 	bool "Xilinx AXI PCIe host bridge support"
+-	depends on ARCH_ZYNQ || MICROBLAZE || (MIPS && PCI_DRIVERS_GENERIC) || COMPILE_TEST
++	depends on OF || COMPILE_TEST
+ 	help
+ 	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
+ 	  Host Bridge driver.
+diff -urN linux-4.18/include/linux/cpuhotplug.h riscv-linux-riscv-linux-4.18/include/linux/cpuhotplug.h
+--- linux-4.18/include/linux/cpuhotplug.h	2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/include/linux/cpuhotplug.h	2018-08-27 17:52:36.000000000 +0100
+@@ -125,6 +125,7 @@
+ 	CPUHP_AP_MARCO_TIMER_STARTING,
+ 	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+ 	CPUHP_AP_ARC_TIMER_STARTING,
++	CPUHP_AP_RISCV_TIMER_STARTING,
+ 	CPUHP_AP_KVM_STARTING,
+ 	CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
+ 	CPUHP_AP_KVM_ARM_VGIC_STARTING,
