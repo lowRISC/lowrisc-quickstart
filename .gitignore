@@ -5,3 +5,4 @@ linux-4.18.tar.xz
 master.zip
 lowrisc-fpga/
 riscv-pk/
+chip_top.bit*

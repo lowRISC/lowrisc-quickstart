@@ -1,13 +1,21 @@
+#Vivado installs default to this address, if you used a different value, or a server
+#specify the new value of XILINX_TOP in the environment
+export XILINX_TOP=/opt/Xilinx
+export XILINX_VIVADO=$(XILINX_TOP)/Vivado/2018.1
 export TOP=$(PWD)
 export RISCV=$(TOP)/distrib
-export PATH:=$(RISCV)/bin:$(PATH)
+export PATH:=$(RISCV)/bin:$(XILINX_VIVADO)/bin:$(XILINX_TOP)/SDK/2018.1/bin:$(XILINX_TOP)/DocNav:$(PATH)
+export IP=192.168.0.51
 
-all: kernel tools build
+all: kernel tools build bbl
 
 kernel: linux-4.18-patched/.config
-tools: distrib/STAMP.unzip
 build: linux-4.18-patched/vmlinux
 bbl: riscv-pk/STAMP.bbl riscv-pk/build/bbl
+
+#The tools target downloads prebuilt executables from the firesim project.
+#This may or may not suit you depending on the available download bandwidth
+tools: distrib/STAMP.unzip
 
 master.zip:
 	wget https://github.com/firesim/firesim-riscv-tools-prebuilt/archive/master.zip
@@ -46,4 +54,13 @@ lowrisc-fpga/STAMP.fpga:
 	touch $@
 
 download: lowrisc-fpga/STAMP.fpga riscv-pk/build/bbl
-	lowrisc-fpga/common/script/recvRawEth -r -s 192.168.0.51 riscv-pk/build/bbl
+	lowrisc-fpga/common/script/recvRawEth -r -s $(IP) riscv-pk/build/bbl
+
+program-cfgmem: chip_top.bit.mcs
+	vivado -mode batch -source lowrisc-fpga/common/script/program_cfgmem.tcl -tclargs "xc7a100t_0" chip_top.bit.mcs
+
+chip_top.bit.mcs: chip_top.bit
+	vivado -mode batch -source lowrisc-fpga/common/script/cfgmem.tcl -tclargs "xc7a100t_0" chip_top.bit
+
+chip_top.bit:
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc1/chip_top.bit > $@
