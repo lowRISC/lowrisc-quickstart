@@ -6,3 +6,6 @@ master.zip
 lowrisc-fpga/
 riscv-pk/
 chip_top.bit*
+cardmem.bin
+cardmem.log
+rootfs.tar.xz

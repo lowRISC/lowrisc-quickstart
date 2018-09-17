@@ -6,9 +6,13 @@ export TOP=$(PWD)
 export RISCV=$(TOP)/distrib
 export PATH:=$(RISCV)/bin:$(XILINX_VIVADO)/bin:$(XILINX_TOP)/SDK/2018.1/bin:$(XILINX_TOP)/DocNav:$(PATH)
 export IP=192.168.0.51
+export USB=sdc
+
+.SUFFIXES:
 
 all: kernel tools build bbl
 
+partition: umount cardmem.log
 kernel: linux-4.18-patched/.config
 build: linux-4.18-patched/vmlinux
 bbl: riscv-pk/STAMP.bbl riscv-pk/build/bbl
@@ -35,17 +39,20 @@ linux-4.18-patched/.config: linux-4.18.tar.xz
 	patch -d linux-4.18-patched -p1 < lowrisc.patch
 	cp -p lowrisc_defconfig linux-4.18-patched/.config
 
-linux-4.18-patched/vmlinux: linux-4.18-patched/.config
+linux-4.18-patched/vmlinux: linux-4.18-patched/.config initramfs.cpio
 	make -C linux-4.18-patched ARCH=riscv -j 4 CROSS_COMPILE=riscv64-unknown-linux-gnu- CONFIG_INITRAMFS_SOURCE="../initramfs.cpio"
 
-riscv-pk/STAMP.bbl: linux-4.18-patched/vmlinux
+riscv-pk/STAMP.bbl:
+	rm -rf riscv-pk
 	git clone -b quickstart https://github.com/lowRISC/riscv-pk.git
+	touch $@
+
+riscv-pk/build/lowrisc.dtb: lowrisc.dts riscv-pk/STAMP.bbl linux-4.18-patched/vmlinux
 	mkdir -p riscv-pk/build
 	linux-4.18-patched/scripts/dtc/dtc lowrisc.dts -O dtb -o riscv-pk/build/lowrisc.dtb
 	(cd riscv-pk/build; ../configure --prefix=$(RISCV) --host=riscv64-unknown-elf --with-payload=$(TOP)/linux-4.18-patched/vmlinux --enable-logo --enable-print-device-tree)
-	touch $@
 
-riscv-pk/build/bbl: riscv-pk/STAMP.bbl 
+riscv-pk/build/bbl: riscv-pk/STAMP.bbl riscv-pk/build/lowrisc.dtb
 	make -C riscv-pk/build bbl
 
 lowrisc-fpga/STAMP.fpga:
@@ -64,3 +71,32 @@ chip_top.bit.mcs: chip_top.bit
 
 chip_top.bit:
 	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc1/chip_top.bit > $@
+
+fatdisk: cardmem.log 
+	sudo mkdir -p /mnt/deadbeef-01
+	sudo mount /dev/`grep deadbeef-01 $< | cut -d\" -f2` /mnt/deadbeef-01
+	sudo cp riscv-pk/build/bbl /mnt/deadbeef-01
+	sudo umount /mnt/deadbeef-01
+
+extdisk:  cardmem.log rootfs.tar.xz
+	sudo mkdir -p /mnt/deadbeef-02
+	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
+	sudo tar xJf rootfs.tar.xz -C /mnt/deadbeef-02
+	sudo umount /mnt/deadbeef-02
+
+cardmem.log: cardmem.sh
+#	dd if=/dev/zero of=cardmem.bin bs=2M count=2047
+	sh cardmem.sh /dev/$(USB)
+#	sudo partx -a /dev/$(USB)
+	sleep 2
+	lsblk -P -o NAME,PARTUUID | grep $(USB) | grep deadbeef | tail -3 > $@
+
+mkfs: cardmem.log
+	sudo mkfs -t msdos /dev/`grep deadbeef-01 $< | cut -d\" -f2`
+	sudo mkfs -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2`
+	sudo mkswap /dev/`grep deadbeef-03 $< |cut -d\" -f2`
+
+umount:
+	for i in `lsblk -P -o NAME,MOUNTPOINT |grep $(USB) | grep 'MOUNTPOINT="/' | cut -d\" -f4`; do umount $$i; done
+	sudo partx -d /dev/$(USB)
+

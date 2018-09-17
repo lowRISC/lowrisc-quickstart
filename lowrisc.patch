@@ -2751,18 +2751,15 @@ diff -urN linux-4.18-patched/drivers/video/console/Makefile riscv-linux-riscv-li
  obj-$(CONFIG_SGI_NEWPORT_CONSOLE) += newport_con.o
  obj-$(CONFIG_STI_CONSOLE)         += sticon.o sticore.o
  obj-$(CONFIG_VGA_CONSOLE)         += vgacon.o
-Binary files linux-4.18-patched/initramfs.cpio and riscv-linux-riscv-linux-4.18/initramfs.cpio differ
-diff -urN linux-4.18-patched/make_root.sh riscv-linux-riscv-linux-4.18/make_root.sh
---- linux-4.18-patched/make_root.sh	1970-01-01 01:00:00.000000000 +0100
-+++ riscv-linux-riscv-linux-4.18/make_root.sh	2018-09-16 09:44:28.503574399 +0100
-@@ -0,0 +1,9 @@
-+if [ -f .config ]; then echo configured; else make ARCH=riscv defconfig; fi
-+make ARCH=riscv -j 4 CROSS_COMPILE=riscv64-unknown-linux-gnu- CONFIG_INITRAMFS_SOURCE="initramfs.cpio"
-+scripts/dtc/dtc /var/tmp/lowrisc-chip/rocket-chip/riscv-tools/riscv-pk/machine/lowrisc.dts -O dtb -o /var/tmp/lowrisc-chip/rocket-chip/riscv-tools/riscv-pk/build/lowrisc.dtb
-+cd /var/tmp/lowrisc-chip/rocket-chip/riscv-tools/riscv-pk/build
-+../configure --prefix=$RISCV --host=riscv64-unknown-elf --with-payload=/home/jrrk2/Downloads/riscv-linux-riscv-linux-4.18/vmlinux --enable-logo --enable-print-device-tree
-+rm payload.o
-+make
-+#riscv64-unknown-elf-strip bbl
-+../../../../fpga/common/script/recvRawEth -r -s 192.168.0.51 bbl
-Binary files linux-4.18-patched/usr/initramfs_data.cpio.gz and riscv-linux-riscv-linux-4.18/usr/initramfs_data.cpio.gz differ
+diff -urN linux-4.18-patched/kernel/dma/swiotlb.c riscv-linux-riscv-linux-4.18/kernel/dma/swiotlb.c
+--- linux-4.18-patched/kernel/dma/swiotlb.c     2018-08-12 21:41:04.000000000 +0100
++++ riscv-linux-riscv-linux-4.18/kernel/dma/swiotlb.c 2018-09-17 15:23:49.410795216 +0100
+@@ -147,7 +147,7 @@
+ }
+ 
+ /* default to 64MB */
+-#define IO_TLB_DEFAULT_SIZE (64UL<<20)
++#define IO_TLB_DEFAULT_SIZE (1UL<<20)
+ unsigned long swiotlb_size_or_default(void)
+ {
+        unsigned long size;
