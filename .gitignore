@@ -9,3 +9,8 @@ chip_top.bit*
 cardmem.bin
 cardmem.log
 rootfs.tar.xz
+vivado*
+loopback.img
+boot.bin
+sdcard.img
+sdcard.img.log
