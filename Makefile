@@ -22,6 +22,7 @@ partition: umount $(CARDMEM).log
 kernel: linux-4.18-patched/.config
 build: linux-4.18-patched/vmlinux
 bbl: riscv-pk/STAMP.bbl riscv-pk/build/bbl
+install: umount cleandisk partition mkfs fatdisk extdisk
 
 #The tools target downloads prebuilt executables from the firesim project.
 #This may or may not suit you depending on the available download bandwidth
@@ -89,10 +90,13 @@ extdisk: $(CARDMEM).log rootfs.tar.xz
 	sudo mkdir -p /mnt/deadbeef-02
 	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
 	sudo tar xJf rootfs.tar.xz -C /mnt/deadbeef-02
+	sudo mkdir -p /mnt/deadbeef-02/mnt/dos
+	sudo cp fstab.riscv /mnt/deadbeef-02/etc/fstab
+	sudo sed s=@=$(USER)= < firstboot.riscv | sudo tee /mnt/deadbeef-02/etc/profile.d/firstboot.sh
 	sudo umount /mnt/deadbeef-02
 
 $(CARDMEM).log: cardmem.sh
-	-sudo partx -d /dev/$(USB)
+	lsblk -P -o NAME|grep $(USB) | grep [1-9] && sudo partx -d /dev/$(USB)
 	sudo sh cardmem.sh /dev/$(USB)
 	sleep 2
 	lsblk -P -o NAME,PARTUUID | grep $(USB) | grep deadbeef | tail -4 > $@
@@ -105,7 +109,6 @@ mkfs: $(CARDMEM).log
 
 umount:
 	for i in `lsblk -P -o NAME,MOUNTPOINT |grep $(USB) | grep 'MOUNTPOINT="/' | cut -d\" -f4`; do umount $$i; done
-	sudo partx -d /dev/$(USB)
 
 #These targets are for generating prebuild filing system images
 #They are deprecated because writing to a real disk will be slower than direct creation

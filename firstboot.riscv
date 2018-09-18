@@ -1,0 +1,6 @@
+echo 'This is the firstboot script. It will display only once'
+echo 'Set the superuser (root) password below'
+passwd root
+echo 'Create a normal user below'
+adduser @
+exec rm /etc/profile.d/firstboot.sh
