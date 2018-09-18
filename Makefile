@@ -73,10 +73,10 @@ bblupdate: riscv-pk/build/bbl
 	cp riscv-pk/build/bbl boot.bin
 	riscv64-unknown-linux-gnu-strip boot.bin
 
-program-cfgmem: chip_top.bit.mcs
+program-cfgmem: chip_top.bit.mcs lowrisc-fpga/STAMP.fpga
 	vivado -mode batch -source lowrisc-fpga/common/script/program_cfgmem.tcl -tclargs "xc7a100t_0" chip_top.bit.mcs
 
-chip_top.bit.mcs: chip_top.bit
+chip_top.bit.mcs: chip_top.bit lowrisc-fpga/STAMP.fpga
 	vivado -mode batch -source lowrisc-fpga/common/script/cfgmem.tcl -tclargs "xc7a100t_0" chip_top.bit
 
 fatdisk: $(CARDMEM).log boot.bin
@@ -131,3 +131,4 @@ chip_top.bit:
 rootfs.tar.xz:
 	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
 
+clean: cleanrelease cleandisk
