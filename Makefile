@@ -125,6 +125,14 @@ loopback.img: rootfs.tar.xz
 	sudo mkfs -t ext4 $@
 	sudo mount -t ext4 -o loop $@ 
 
+memstick: chip_top.bit umount
+	sudo sh memstick.sh /dev/$(USB)
+	sudo mkfs.fat /dev/$(USB)1
+	sudo mkdir -p /mnt/msdos
+	sudo mount -t msdos /dev/$(USB)1 /mnt/msdos
+	sudo cp $< /mnt/msdos
+	sudo umount /mnt/msdos
+
 boot.bin:
 	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
 
