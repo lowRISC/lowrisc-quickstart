@@ -57,6 +57,7 @@ riscv-pk/STAMP.bbl:
 riscv-pk/build/lowrisc.dtb: lowrisc.dts riscv-pk/STAMP.bbl linux-4.18-patched/vmlinux
 	mkdir -p riscv-pk/build
 	linux-4.18-patched/scripts/dtc/dtc lowrisc.dts -O dtb -o riscv-pk/build/lowrisc.dtb
+	(cd riscv-pk; autoreconf -i)
 	(cd riscv-pk/build; ../configure --prefix=$(RISCV) --host=riscv64-unknown-elf --with-payload=$(TOP)/linux-4.18-patched/vmlinux --enable-logo --enable-print-device-tree)
 
 riscv-pk/build/bbl: riscv-pk/STAMP.bbl riscv-pk/build/lowrisc.dtb
@@ -132,6 +133,30 @@ memstick: chip_top.bit umount
 	sudo mount -t msdos /dev/$(USB)1 /mnt/msdos
 	sudo cp $< /mnt/msdos
 	sudo umount /mnt/msdos
+
+customise: $(CARDMEM).log
+	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
+	sudo chroot /mnt/deadbeef-02
+	sudo umount /mnt/deadbeef-02
+
+/proc/sys/fs/binfmt_misc/qemu-riscv64: ./qemu-riscv64
+	sudo update-binfmts --import $<
+
+debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd
+	openocd -f openocd-nexys4ddr.cfg
+
+gdb: riscv-pk/build/bbl
+	riscv64-unknown-elf-gdb -tui riscv-pk/build/bbl
+
+./distrib/bin/openocd:
+	(cd riscv-openocd; find . -iname configure.ac | sed s/configure.ac/m4/ | xargs mkdir -p; autoreconf -i)
+	(mkdir riscv-openocd/build; cd riscv-openocd/build; ../configure --prefix=$(RISCV) --enable-remote-bitbang --enable-jtag_vpi --disable-werror)
+	make -C riscv-openocd/build
+	make -C riscv-openocd/build install
+
+riscv-openocd/STAMP.openocd:
+	git clone -b refresh-v0.6 --recursive https://github.com/lowRISC/riscv-openocd.git
+	touch $@
 
 boot.bin:
 	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@

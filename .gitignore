@@ -14,3 +14,4 @@ loopback.img
 boot.bin
 sdcard.img
 sdcard.img.log
+riscv-openocd/
