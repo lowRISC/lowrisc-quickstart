@@ -44,10 +44,10 @@ linux-4.18-patched/.config: linux-4.18.tar.xz
 	mv linux-4.18{,-patched}
 	patch -d linux-4.18-patched -p1 < riscv.patch
 	patch -d linux-4.18-patched -p1 < lowrisc.patch
-	cp -p lowrisc_defconfig linux-4.18-patched/.config
+	cp -p lowrisc_defconfig linux-4.18-patched/arch/riscv/configs/defconfig
 
 linux-4.18-patched/vmlinux: linux-4.18-patched/.config initramfs.cpio
-	make -C linux-4.18-patched ARCH=riscv -j 4 CROSS_COMPILE=riscv64-unknown-linux-gnu- CONFIG_INITRAMFS_SOURCE="../initramfs.cpio"
+	make -C linux-4.18-patched defconfig all ARCH=riscv -j 4 CROSS_COMPILE=riscv64-unknown-linux-gnu- CONFIG_INITRAMFS_SOURCE="../initramfs.cpio"
 
 riscv-pk/STAMP.bbl:
 	rm -rf riscv-pk
