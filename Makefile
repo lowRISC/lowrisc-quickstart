@@ -167,4 +167,7 @@ chip_top.bit:
 rootfs.tar.xz:
 	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
 
+initramfs.cpio:
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
+
 clean: cleanrelease cleandisk
