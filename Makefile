@@ -38,7 +38,7 @@ distrib/STAMP.unzip: master.zip
 linux-4.18.tar.xz:
 	wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.18.tar.xz
 
-linux-4.18-patched/.config: linux-4.18.tar.xz
+linux-4.18-patched/.config: linux-4.18.tar.xz riscv.patch lowrisc.patch gpio.patch
 	tar xJf $<
 	rm -rf linux-4.18-patched
 	mv linux-4.18 linux-4.18-patched
