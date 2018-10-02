@@ -147,8 +147,8 @@ debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xi
 
 /etc/udev/rules.d/52-xilinx-digilent-usb.rules:
 	echo '# Rules for Digilent USB user access' > 52-xilinx-digilent-usb.rules
-	echo ATTR{idVendor}=="1443", MODE:="666" >> 52-xilinx-digilent-usb.rules
-	echo ACTION=="add", ATTR{idVendor}=="0403", ATTR{manufacturer}=="Digilent", MODE:="666" >> 52-xilinx-digilent-usb.rules
+	echo 'ATTR{idVendor}=="1443", MODE:="666"' >> 52-xilinx-digilent-usb.rules
+	echo 'ACTION=="add", ATTR{idVendor}=="0403", ATTR{manufacturer}=="Digilent", MODE:="666"' >> 52-xilinx-digilent-usb.rules
 	sudo mv -f 52-xilinx-digilent-usb.rules $@
 	sudo chown root:root $@
 	sudo chmod 644 $@
