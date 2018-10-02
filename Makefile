@@ -41,7 +41,7 @@ linux-4.18.tar.xz:
 linux-4.18-patched/.config: linux-4.18.tar.xz
 	tar xJf $<
 	rm -rf linux-4.18-patched
-	mv linux-4.18{,-patched}
+	mv linux-4.18 linux-4.18-patched
 	patch -d linux-4.18-patched -p1 < riscv.patch
 	patch -d linux-4.18-patched -p1 < lowrisc.patch
 	cp -p lowrisc_defconfig linux-4.18-patched/arch/riscv/configs/defconfig
