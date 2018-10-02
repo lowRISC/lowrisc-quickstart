@@ -790,6 +790,7 @@ CONFIG_HVC_RISCV_SBI=y
 #
 # PCMCIA character devices
 #
+CONFIG_LOWRISC_GPIO=y
 # CONFIG_RAW_DRIVER is not set
 # CONFIG_TCG_TPM is not set
 # CONFIG_XILLYBUS is not set

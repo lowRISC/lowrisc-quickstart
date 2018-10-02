@@ -198,3 +198,19 @@ diff -ur linux-4.18-patched/drivers/mmc/host/lowrisc_sd.h ../lowrisc-chip-refres
  struct lowrisc_sd_host {
    struct platform_device *pdev;
    struct mmc_host *mmc;
+diff -ur linux-4.18-patched/drivers/char/Kconfig ../lowrisc-chip-refresh-v0.6/riscv-linux/drivers/char/Kconfig
+--- linux-4.18-patched/drivers/char/Kconfig	2018-08-12 21:41:04.000000000 +0100
++++ ../lowrisc-chip-refresh-v0.6/riscv-linux/drivers/char/Kconfig	2018-10-01 14:57:41.748038533 +0100
+@@ -448,6 +448,12 @@
+ 	  pc8736x_gpio drivers.  If those drivers are built as
+ 	  modules, this one will be too, named nsc_gpio
+ 
++config LOWRISC_GPIO
++	tristate "LowRISC Nexys4DDR GPIO Support"
++	depends on RISCV
++	help
++	  Support access to LEDs / switches on Nexys4DDR under LowRISC
++
+ config RAW_DRIVER
+ 	tristate "RAW driver (/dev/raw/rawN)"
+ 	depends on BLOCK
