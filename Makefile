@@ -149,6 +149,7 @@ debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xi
 	echo ATTR{idVendor}=="1443", MODE:="666" > 52-xilinx-digilent-usb.rules
 	echo ACTION=="add", ATTR{idVendor}=="0403", ATTR{manufacturer}=="Digilent", MODE:="666" >> 52-xilinx-digilent-usb.rules
 	sudo mv -f 52-xilinx-digilent-usb.rules $@
+	sudo /sbin/udevcontrol reload_rules
 
 gdb: riscv-pk/build/bbl
 	riscv64-unknown-elf-gdb -tui riscv-pk/build/bbl
