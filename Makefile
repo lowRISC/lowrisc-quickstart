@@ -142,8 +142,13 @@ customise: $(CARDMEM).log
 /proc/sys/fs/binfmt_misc/qemu-riscv64: ./qemu-riscv64
 	sudo update-binfmts --import $<
 
-debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd
+debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xilinx-digilent-usb.rules
 	openocd -f openocd-nexys4ddr.cfg
+
+/etc/udev/rules.d/52-xilinx-digilent-usb.rules:
+	echo ATTR{idVendor}=="1443", MODE:="666" > 52-xilinx-digilent-usb.rules
+	echo ACTION=="add", ATTR{idVendor}=="0403", ATTR{manufacturer}=="Digilent", MODE:="666" >> 52-xilinx-digilent-usb.rules
+	sudo mv -f 52-xilinx-digilent-usb.rules $@
 
 gdb: riscv-pk/build/bbl
 	riscv64-unknown-elf-gdb -tui riscv-pk/build/bbl
