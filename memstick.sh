@@ -1,3 +1,4 @@
+source ./skipchk.sh
 echo ' # partition table of image\' \
      'label: dos\' \
      'label-id: 0xc001f00d\' \

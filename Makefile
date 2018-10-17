@@ -6,7 +6,7 @@ export TOP=$(PWD)
 export RISCV=$(TOP)/distrib
 export PATH:=$(RISCV)/bin:$(XILINX_VIVADO)/bin:$(XILINX_TOP)/SDK/2018.1/bin:$(XILINX_TOP)/DocNav:$(PATH)
 export IP=192.168.0.51
-export USB=sdc
+export USB=xyzzy
 export CARDMEM=cardmem
 
 .SUFFIXES:
@@ -99,6 +99,7 @@ extdisk: $(CARDMEM).log rootfs.tar.xz
 	sudo umount /mnt/deadbeef-02
 
 $(CARDMEM).log: cardmem.sh
+	@sh skipchk.sh /dev/$(USB)
 	lsblk -P -o NAME|grep $(USB) | grep [1-9] && sudo partx -d /dev/$(USB)
 	sudo sh cardmem.sh /dev/$(USB)
 	sleep 2
@@ -111,7 +112,8 @@ mkfs: $(CARDMEM).log
 	sudo mkfs -t ext4 /dev/`grep deadbeef-04 $< | cut -d\" -f2`
 
 umount:
-	for i in `lsblk -P -o NAME,MOUNTPOINT |grep $(USB) | grep 'MOUNTPOINT="/' | cut -d\" -f4`; do umount $$i; done
+	@sh skipchk.sh /dev/$(USB)
+	for i in `lsblk -P -o NAME,MOUNTPOINT | grep $(USB) | grep 'MOUNTPOINT="/' | cut -d\" -f4`; do umount $$i; done
 
 #These targets are for generating prebuild filing system images
 #They are deprecated because writing to a real disk will be slower than direct creation
@@ -128,7 +130,7 @@ loopback.img: rootfs.tar.xz
 	sudo mkfs -t ext4 $@
 	sudo mount -t ext4 -o loop $@ 
 
-memstick: chip_top.bit umount
+memstick: chip_top.bit /dev/$(USB) umount
 	sudo sh memstick.sh /dev/$(USB)
 	sudo mkfs.fat /dev/$(USB)1
 	sudo mkdir -p /mnt/msdos
@@ -183,3 +185,7 @@ initramfs.cpio:
 	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
 
 clean: cleanrelease cleandisk
+
+/dev/xyzzy:
+	@echo Dummy device $@ selected. Be sure to call this Makefile with USB=your_disk_name
+	@false
