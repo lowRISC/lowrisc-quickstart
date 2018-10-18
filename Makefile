@@ -173,16 +173,16 @@ riscv-openocd/STAMP.openocd:
 	touch $@
 
 boot.bin:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
 
 chip_top.bit:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
 
 rootfs.tar.xz:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
 
 initramfs.cpio:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc3/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
 
 clean: cleanrelease cleandisk
 
