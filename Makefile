@@ -66,7 +66,7 @@ riscv-pk/build/bbl: riscv-pk/STAMP.bbl riscv-pk/build/lowrisc.dtb
 	make -C riscv-pk/build bbl
 
 lowrisc-fpga/STAMP.fpga:
-	git clone -b refresh-v0.6 https://github.com/lowrisc/lowrisc-fpga.git
+	git clone -b ariane-v0.7 https://github.com/lowrisc/lowrisc-fpga.git
 	make -C lowrisc-fpga/common/script
 	touch $@
 
@@ -169,20 +169,20 @@ gdb: riscv-pk/build/bbl
 	make -C riscv-openocd/build install
 
 riscv-openocd/STAMP.openocd:
-	git clone -b refresh-v0.6 --recursive https://github.com/lowRISC/riscv-openocd.git
+	git clone -b ariane-v0.7 --recursive https://github.com/lowRISC/riscv-openocd.git
 	touch $@
 
 boot.bin:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@ > $@
 
 chip_top.bit:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@ > $@
 
 rootfs.tar.xz:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@ > $@
 
 initramfs.cpio:
-	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@ > $@
+	curl -L https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@ > $@
 
 clean: cleanrelease cleandisk
 
