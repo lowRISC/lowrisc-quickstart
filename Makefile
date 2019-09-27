@@ -84,32 +84,32 @@ chip_top.bit.mcs: chip_top.bit lowrisc-fpga/STAMP.fpga
 	vivado -mode batch -source lowrisc-fpga/common/script/cfgmem.tcl -tclargs "xc7a100t_0" chip_top.bit
 
 fatdisk: $(CARDMEM).log boot.bin
-	sudo mkdir -p /mnt/deadbeef-01
-	sudo mount /dev/`grep deadbeef-01 $< | cut -d\" -f2` /mnt/deadbeef-01
-	sudo cp boot.bin /mnt/deadbeef-01
-	sudo umount /mnt/deadbeef-01
+	sudo mkdir -p /mnt/$(USB)1
+	sudo mount /dev/$(USB)1 /mnt/$(USB)1
+	sudo cp boot.bin /mnt/$(USB)1
+	sudo umount /mnt/$(USB)1
 
 extdisk: $(CARDMEM).log rootfs.tar.xz
-	sudo mkdir -p /mnt/deadbeef-02
-	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
-	sudo tar xJf rootfs.tar.xz -C /mnt/deadbeef-02
-	sudo mkdir -p /mnt/deadbeef-02/mnt/dos
-	sudo cp fstab.riscv /mnt/deadbeef-02/etc/fstab
-	sudo sed s=@=$(USER)= < firstboot.riscv | sudo tee /mnt/deadbeef-02/etc/profile.d/firstboot.sh
-	sudo umount /mnt/deadbeef-02
+	sudo mkdir -p /mnt/$(USB)2
+	sudo mount -t ext4 /dev/$(USB)2 /mnt/$(USB)2
+	sudo tar xJf rootfs.tar.xz -C /mnt/$(USB)2
+	sudo mkdir -p /mnt/$(USB)2/mnt/dos
+	sudo cp fstab.riscv /mnt/$(USB)2/etc/fstab
+	sudo sed s=@=$(USER)= < firstboot.riscv | sudo tee /mnt/$(USB)2/etc/profile.d/firstboot.sh
+	sudo umount /mnt/$(USB)2
 
 $(CARDMEM).log: cardmem.sh
 	@sh skipchk.sh /dev/$(USB)
 	lsblk -P -o NAME|grep $(USB) | grep [1-9] && sudo partx -d /dev/$(USB)
 	sudo sh cardmem.sh /dev/$(USB)
 	sleep 2
-	lsblk -P -o NAME,PARTUUID | grep $(USB) | grep deadbeef | tail -4 > $@
+	lsblk -P -o NAME,PARTUUID | grep $(USB) | grep $(USB) | tail -4 > $@
 
 mkfs: $(CARDMEM).log
-	sudo mkfs -t msdos /dev/`grep deadbeef-01 $< | cut -d\" -f2`
-	sudo mkfs -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2`
-	sudo mkswap /dev/`grep deadbeef-03 $< |cut -d\" -f2`
-	sudo mkfs -t ext4 /dev/`grep deadbeef-04 $< | cut -d\" -f2`
+	sudo mkfs -t msdos /dev/$(USB)1
+	sudo mkfs -t ext4 /dev/$(USB)2
+	sudo mkswap /dev/$(USB)3
+	sudo mkfs -t ext4 /dev/$(USB)4
 
 umount:
 	@sh skipchk.sh /dev/$(USB)
@@ -122,7 +122,7 @@ sdcard.img: rootfs.tar.xz
 	sh cardmem.sh $@
 	-sudo partx -a $@
 	sleep 2
-	lsblk -P -o NAME,PARTUUID | grep deadbeef | tail -4 > $@.log
+	lsblk -P -o NAME,PARTUUID | grep $(USB) | tail -4 > $@.log
 	make mkfs fatdisk extdisk CARDMEM=$@
 
 loopback.img: rootfs.tar.xz
@@ -139,9 +139,9 @@ memstick: chip_top.bit /dev/$(USB) umount
 	sudo umount /mnt/msdos
 
 customise: $(CARDMEM).log
-	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
-	sudo chroot /mnt/deadbeef-02
-	sudo umount /mnt/deadbeef-02
+	sudo mount -t ext4 /dev/$(USB)2 /mnt/$(USB)2
+	sudo chroot /mnt/$(USB)2
+	sudo umount /mnt/$(USB)2
 
 /proc/sys/fs/binfmt_misc/qemu-riscv64: ./qemu-riscv64
 	sudo update-binfmts --import $<
