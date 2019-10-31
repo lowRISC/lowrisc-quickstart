@@ -47,7 +47,6 @@ extdisk: $(CARDMEM).log rootfs.tar.xz
 	sudo mkdir -p /mnt/deadbeef-02
 	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
 	sudo tar xJf rootfs.tar.xz -C /mnt/deadbeef-02
-	sudo sed s=@=$(USER)= < firstboot.riscv | sudo tee /mnt/deadbeef-02/etc/profile.d/firstboot.sh
 	sudo umount /mnt/deadbeef-02
 
 part: $(CARDMEM).log
@@ -134,9 +133,6 @@ $(BITFILE).bit:
 	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
 
 rootfs.tar.xz:
-	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
-
-initramfs.cpio:
 	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
 
 clean: cleanrelease cleandisk
