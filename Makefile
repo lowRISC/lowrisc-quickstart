@@ -112,20 +112,6 @@ debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xi
 	sudo udevadm control --reload
 	sudo udevadm trigger --action=add
 
-EXE = boot.bin
-gdb: $(EXE)
-	riscv64-unknown-elf-gdb -tui $(EXE)
-
-./distrib/bin/openocd: riscv-openocd/STAMP.openocd
-	(cd riscv-openocd; find . -iname configure.ac | sed s/configure.ac/m4/ | xargs mkdir -p; autoreconf -i)
-	(mkdir riscv-openocd/build; cd riscv-openocd/build; ../configure --prefix=$(RISCV) --enable-remote-bitbang --enable-jtag_vpi --disable-werror)
-	make -s -C riscv-openocd/build
-	make -s -C riscv-openocd/build install
-
-riscv-openocd/STAMP.openocd:
-	git clone -b lowrisc-v0.7 --recursive https://github.com/jrrk2/riscv-openocd.git
-	touch $@
-
 boot.bin:
 	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
 
