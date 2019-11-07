@@ -2,8 +2,6 @@
 #specify the new value of XILINX_TOP in the environment
 export XILINX_TOP=/opt/Xilinx
 export XILINX_VIVADO=$(XILINX_TOP)/Vivado/2018.1
-export TOP=$(PWD)
-export RISCV=$(TOP)/distrib
 export PATH:=$(RISCV)/bin:$(XILINX_VIVADO)/bin:$(XILINX_TOP)/SDK/2018.1/bin:$(XILINX_TOP)/DocNav:$(PATH)
 export REMOTE=192.168.0.51
 export USB=xyzzy
@@ -99,7 +97,7 @@ customise: $(CARDMEM).log
 /proc/sys/fs/binfmt_misc/qemu-riscv64: ./qemu-riscv64
 	sudo update-binfmts --import $<
 
-debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xilinx-digilent-usb.rules
+debug: $(RISCV)/bin/openocd /etc/udev/rules.d/52-xilinx-digilent-usb.rules
 	openocd -f openocd-nexys4ddr.cfg
 
 /etc/udev/rules.d/52-xilinx-digilent-usb.rules:
@@ -111,20 +109,6 @@ debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xi
 	sudo chmod 644 $@
 	sudo udevadm control --reload
 	sudo udevadm trigger --action=add
-
-EXE = riscv-pk/build/bbl
-gdb: $(EXE)
-	riscv64-unknown-elf-gdb -tui $(EXE)
-
-./distrib/bin/openocd:
-	(cd riscv-openocd; find . -iname configure.ac | sed s/configure.ac/m4/ | xargs mkdir -p; autoreconf -i)
-	(mkdir riscv-openocd/build; cd riscv-openocd/build; ../configure --prefix=$(RISCV) --enable-remote-bitbang --enable-jtag_vpi --disable-werror)
-	make -C riscv-openocd/build
-	make -C riscv-openocd/build install
-
-riscv-openocd/STAMP.openocd:
-	git clone -b ariane-v0.7 --recursive https://github.com/lowRISC/riscv-openocd.git
-	touch $@
 
 boot.bin:
 	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
