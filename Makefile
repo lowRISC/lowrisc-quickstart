@@ -2,8 +2,6 @@
 #specify the new value of XILINX_TOP in the environment
 export XILINX_TOP=/opt/Xilinx
 export XILINX_VIVADO=$(XILINX_TOP)/Vivado/2018.1
-export TOP=$(PWD)
-export RISCV=$(TOP)/distrib
 export PATH:=$(RISCV)/bin:$(XILINX_VIVADO)/bin:$(XILINX_TOP)/SDK/2018.1/bin:$(XILINX_TOP)/DocNav:$(PATH)
 export REMOTE=192.168.0.51
 export USB=xyzzy
@@ -99,7 +97,7 @@ customise: $(CARDMEM).log
 /proc/sys/fs/binfmt_misc/qemu-riscv64: ./qemu-riscv64
 	sudo update-binfmts --import $<
 
-debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xilinx-digilent-usb.rules
+debug: $(RISCV)/bin/openocd /etc/udev/rules.d/52-xilinx-digilent-usb.rules
 	openocd -f openocd-nexys4ddr.cfg
 
 /etc/udev/rules.d/52-xilinx-digilent-usb.rules:
