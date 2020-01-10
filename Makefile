@@ -18,13 +18,14 @@ MD5FILE=$(shell md5sum boot.bin | cut -d\  -f1)
 
 all: install
 
-getrelease: boot.bin $(BITFILE).bit rootfs.tar.xz
+getrelease: boot.bin $(BITFILE).bit $(BUILDROOT)
 cleanrelease:
-	rm -f boot.bin $(BITFILE).bit rootfs.tar.xz
+	rm -f boot.bin $(BITFILE).bit $(BUILDROOT)
 cleandisk:
 	rm -f $(CARDMEM).log
 partition: umount $(CARDMEM).log
 install: umount cleandisk partition mkfs fatdisk extdisk
+install-debian: umount cleandisk partition mkfs fatdisk extdisk-debian
 
 download: $(MD5FILE)
 	echo -e bin \\n put $< \\n | tftp $(REMOTE)
@@ -41,7 +42,13 @@ fatdisk: $(CARDMEM).log boot.bin
 	sudo cp boot.bin /mnt/deadbeef-01
 	sudo umount /mnt/deadbeef-01
 
-extdisk: $(CARDMEM).log rootfs.tar.xz
+extdisk: $(CARDMEM).log $(BUILDROOT)
+	sudo mkdir -p /mnt/deadbeef-02
+	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
+	sudo tar xf $(BUILDROOT) -C /mnt/deadbeef-02
+	sudo umount /mnt/deadbeef-02
+
+extdisk-debian: $(CARDMEM).log $(BUILDROOT)
 	sudo mkdir -p /mnt/deadbeef-02
 	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
 	sudo tar xJf rootfs.tar.xz -C /mnt/deadbeef-02
@@ -76,7 +83,7 @@ umount:
 	@sh skipchk.sh /dev/$(USB)
 	for i in `lsblk -P -o NAME,MOUNTPOINT | grep $(USB) | grep 'MOUNTPOINT="/' | cut -d\" -f4`; do umount $$i; done
 
-loopback.img: rootfs.tar.xz
+loopback.img: $(BUILDROOT)
 	dd if=/dev/zero of=$@ bs=2M count=1023
 	sudo mkfs -t ext4 $@
 	sudo mount -t ext4 -o loop $@ 
@@ -114,9 +121,6 @@ boot.bin:
 	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
 
 $(BITFILE).bit:
-	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
-
-rootfs.tar.xz:
 	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
 
 clean: cleanrelease cleandisk
