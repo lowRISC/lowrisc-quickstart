@@ -104,8 +104,8 @@ customise: $(CARDMEM).log
 /proc/sys/fs/binfmt_misc/qemu-riscv64: ./qemu-riscv64
 	sudo update-binfmts --import $<
 
-debug: $(RISCV)/bin/openocd /etc/udev/rules.d/52-xilinx-digilent-usb.rules
-	openocd -f openocd-nexys4ddr.cfg
+debug: ../buildroot-2019.11.1-lowrisc/mainfs/host/bin/openocd /etc/udev/rules.d/52-xilinx-digilent-usb.rules
+	../buildroot-2019.11.1-lowrisc/mainfs/host/bin/openocd -f openocd-nexys4ddr.cfg
 
 /etc/udev/rules.d/52-xilinx-digilent-usb.rules:
 	echo '# Rules for Digilent USB user access' > 52-xilinx-digilent-usb.rules
