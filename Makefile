@@ -34,8 +34,13 @@ download: $(MD5FILE)
 $(MD5FILE): boot.bin
 	cp $< $@
 
-program-cfgmem: $(BITFILE).mcs program_cfgmem_$(BOARD).tcl
-	vivado -mode batch -source program_cfgmem_$(BOARD).tcl -tclargs "xc7a100t_0" $(BITFILE).mcs
+program: program-$(BOARD)
+
+program-genesys2: $(BITFILE).bit
+	env JTAG_PART="xc7k325t_0" JTAG_BITFILE="$(BITFILE).bit" vivado -nojournal -nolog -mode batch -source program.tcl
+
+program-nexys4_ddr: $(BITFILE).bit
+	env JTAG_PART="xc7a100t_0" JTAG_BITFILE="$(BITFILE).bit" vivado -nojournal -nolog -mode batch -source program.tcl
 
 fatdisk: $(CARDMEM).log boot.bin
 	sudo mkdir -p /mnt/deadbeef-01

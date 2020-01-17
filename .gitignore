@@ -1,7 +1,9 @@
 boot.bin
+rescue.bin
 *_xilinx.bit
 *_xilinx.mcs
-initramfs.cpio
+rootfs.cpio
+rootfs.tar.zstd
 rootfs.tar.xz
 *_xilinx.new.bit
 *_xilinx.new.mcs
@@ -10,3 +12,5 @@ sfdisk.log
 vivado*.jou
 vivado*.log
 [0-9a-f]*
+.Xil/
+.nfs*
