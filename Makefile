@@ -10,6 +10,7 @@ export CARDMEM=cardmem
 export BOARD=nexys4_ddr
 #export CPU=ariane
 export CPU=rocket
+export ROOTFS=rootfs.tar.zstd
 
 BITFILE=$(BOARD)_$(CPU)_xilinx
 MD5FILE=$(shell md5sum boot.bin | cut -d\  -f1)
@@ -18,9 +19,9 @@ MD5FILE=$(shell md5sum boot.bin | cut -d\  -f1)
 
 all: install
 
-getrelease: boot.bin $(BITFILE).bit $(BUILDROOT)
+getrelease: boot.bin $(BITFILE).bit $(ROOTFS)
 cleanrelease:
-	rm -f boot.bin $(BITFILE).bit $(BUILDROOT)
+	rm -f boot.bin $(BITFILE).bit $(ROOTFS)
 cleandisk:
 	rm -f $(CARDMEM).log
 partition: umount $(CARDMEM).log
@@ -42,13 +43,13 @@ fatdisk: $(CARDMEM).log boot.bin
 	sudo cp boot.bin /mnt/deadbeef-01
 	sudo umount /mnt/deadbeef-01
 
-extdisk: $(CARDMEM).log $(BUILDROOT)
+extdisk: $(CARDMEM).log $(ROOTFS)
 	sudo mkdir -p /mnt/deadbeef-02
 	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
-	sudo tar xf $(BUILDROOT) -C /mnt/deadbeef-02
+	zstd -d -c $(ROOTFS) | sudo tar xf - -C /mnt/deadbeef-02
 	sudo umount /mnt/deadbeef-02
 
-extdisk-debian: $(CARDMEM).log $(BUILDROOT)
+extdisk-debian: $(CARDMEM).log $(ROOTFS)
 	sudo mkdir -p /mnt/deadbeef-02
 	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
 	sudo tar xJf rootfs.tar.xz -C /mnt/deadbeef-02
@@ -81,9 +82,9 @@ mkfs: $(CARDMEM).log
 
 umount:
 	@sh skipchk.sh /dev/$(USB)
-	for i in `lsblk -P -o NAME,MOUNTPOINT | grep $(USB) | grep 'MOUNTPOINT="/' | cut -d\" -f4`; do umount $$i; done
+	for i in `lsblk -P -o NAME,MOUNTPOINT | grep $(USB) | grep 'MOUNTPOINT="/' | cut -d\" -f4`; do sudo umount $$i; done
 
-loopback.img: $(BUILDROOT)
+loopback.img: $(ROOTFS)
 	dd if=/dev/zero of=$@ bs=2M count=1023
 	sudo mkfs -t ext4 $@
 	sudo mount -t ext4 -o loop $@ 
