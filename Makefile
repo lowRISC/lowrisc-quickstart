@@ -50,13 +50,13 @@ fatdisk: $(CARDMEM).log boot.bin
 
 extdisk: $(CARDMEM).log $(ROOTFS)
 	sudo mkdir -p /mnt/deadbeef-02
-	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
+	sudo mount -t btrfs /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
 	zstd -d -c $(ROOTFS) | sudo tar xf - -C /mnt/deadbeef-02
 	sudo umount /mnt/deadbeef-02
 
 extdisk-debian: $(CARDMEM).log $(ROOTFS)
 	sudo mkdir -p /mnt/deadbeef-02
-	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
+	sudo mount -t btrfs /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
 	sudo tar xJf rootfs.tar.xz -C /mnt/deadbeef-02
 	sudo umount /mnt/deadbeef-02
 
@@ -71,9 +71,9 @@ $(CARDMEM).log: cardmem.sh
 	     'unit: sectors\' \
 	     '\' \
 	     '    2048      65535   c  *\' \
-	     '   67584    4194304   L  -\' \
-	     '   4261888  1048576   S  -\' \
-	     '   5310464        +   L  -\' \
+	     '   67584    8388608   L  -\' \
+	     '   8456192  2097152   S  -\' \
+	     '  10553344        +   L  -\' \
 	    | tr '\\' '\012' | sed 's=^\ ==' | tee sfdisk.log | sudo /sbin/sfdisk -f /dev/$(USB)
 	sudo partprobe -s /dev/$(USB)
 	sleep 2
@@ -81,9 +81,9 @@ $(CARDMEM).log: cardmem.sh
 
 mkfs: $(CARDMEM).log
 	sudo mkfs.msdos -s 8 /dev/`grep deadbeef-01 $< | cut -d\" -f2`
-	sudo mkfs.ext4 -F /dev/`grep deadbeef-02 $< | cut -d\" -f2`
+	sudo mkfs.btrfs --data dup --metadata dup --mixed -f /dev/`grep deadbeef-02 $< | cut -d\" -f2`
 	sudo mkswap /dev/`grep deadbeef-03 $< |cut -d\" -f2`
-	sudo mkfs.ext4 -F /dev/`grep deadbeef-04 $< | cut -d\" -f2`
+	sudo mkfs.btrfs --data dup --metadata dup --mixed -f /dev/`grep deadbeef-04 $< | cut -d\" -f2`
 
 umount:
 	@sh skipchk.sh /dev/$(USB)
@@ -103,7 +103,7 @@ memstick: $(BITFILE).bit /dev/$(USB) umount
 	sudo umount /mnt/msdos
 
 customise: $(CARDMEM).log
-	sudo mount -t ext4 /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
+	sudo mount -t btrfs /dev/`grep deadbeef-02 $< | cut -d\" -f2` /mnt/deadbeef-02
 	sudo chroot /mnt/deadbeef-02
 	sudo umount /mnt/deadbeef-02
 
