@@ -1,7 +1,7 @@
 #Vivado installs default to this address, if you used a different value, or a server
 #specify the new value of XILINX_TOP in the environment
 export XILINX_TOP=/opt/Xilinx
-export XILINX_VIVADO=$(XILINX_TOP)/Vivado/2018.1
+export XILINX_VIVADO=$(XILINX_TOP)/Vivado/2018.2
 export PATH:=$(RISCV)/bin:$(XILINX_VIVADO)/bin:$(XILINX_TOP)/SDK/2018.1/bin:$(XILINX_TOP)/DocNav:$(PATH)
 export REMOTE=192.168.0.51
 export USB=xyzzy
@@ -11,17 +11,20 @@ export BOARD=nexys4_ddr
 #export CPU=ariane
 export CPU=rocket
 export ROOTFS=rootfs.tar.zstd
+export ROOTFSDEB=rootfs.tar.xz
+export BBL=boot
 
-BITFILE=$(BOARD)_$(CPU)_xilinx
+BITFILE=$(BOARD)_$(CPU)_xilinx.new
 MD5FILE=$(shell md5sum boot.bin | cut -d\  -f1)
 
 .SUFFIXES:
 
 all: install
 
-getrelease: boot.bin $(BITFILE).bit $(ROOTFS)
+getrelease: $(BBL).bin $(BITFILE).bit $(ROOTFS)
+getrelease-debian: $(BBL).bin $(BITFILE).bit $(ROOTFSDEB)
 cleanrelease:
-	rm -f boot.bin $(BITFILE).bit $(ROOTFS)
+	rm -f $(BBL).bin $(BITFILE).bit $(ROOTFS)
 cleandisk:
 	rm -f $(CARDMEM).log
 partition: umount $(CARDMEM).log
@@ -31,7 +34,7 @@ install-debian: umount cleandisk partition mkfs fatdisk extdisk-debian
 download: $(MD5FILE)
 	echo -e bin \\n put $< \\n | tftp $(REMOTE)
 
-$(MD5FILE): boot.bin
+$(MD5FILE): $(BBL).bin
 	cp $< $@
 
 program: program-$(BOARD)
@@ -42,10 +45,10 @@ program-genesys2: $(BITFILE).bit
 program-nexys4_ddr: $(BITFILE).bit
 	env JTAG_PART="xc7a100t_0" JTAG_BITFILE="$(BITFILE).bit" vivado -nojournal -nolog -mode batch -source program.tcl
 
-fatdisk: $(CARDMEM).log boot.bin
+fatdisk: $(CARDMEM).log $(BBL).bin
 	sudo mkdir -p /mnt/deadbeef-01
 	sudo mount /dev/`grep deadbeef-01 $< | cut -d\" -f2` /mnt/deadbeef-01
-	sudo cp boot.bin /mnt/deadbeef-01
+	sudo cp $(BBL).bin /mnt/deadbeef-01/boot.bin
 	sudo umount /mnt/deadbeef-01
 
 extdisk: $(CARDMEM).log $(ROOTFS)
@@ -71,9 +74,9 @@ $(CARDMEM).log: cardmem.sh
 	     'unit: sectors\' \
 	     '\' \
 	     '    2048      65535   c  *\' \
-	     '   67584    8388608   L  -\' \
-	     '   8456192  2097152   S  -\' \
-	     '  10553344        +   L  -\' \
+	     '   67584   16777216   L  -\' \
+	     '  16844800  2097152   S  -\' \
+	     '  18941952        +   L  -\' \
 	    | tr '\\' '\012' | sed 's=^\ ==' | tee sfdisk.log | sudo /sbin/sfdisk -f /dev/$(USB)
 	sudo partprobe -s /dev/$(USB)
 	sleep 2
@@ -99,7 +102,7 @@ memstick: $(BITFILE).bit /dev/$(USB) umount
 	sudo mkfs.fat /dev/$(USB)1
 	sudo mkdir -p /mnt/msdos
 	sudo mount -t msdos /dev/$(USB)1 /mnt/msdos
-	sudo cp $< /mnt/msdos
+	sudo cp $< /mnt/msdos/xilinx.bit
 	sudo umount /mnt/msdos
 
 customise: $(CARDMEM).log
@@ -124,10 +127,19 @@ debug: ../buildroot-2019.11.1-lowrisc/mainfs/host/bin/openocd /etc/udev/rules.d/
 	sudo udevadm trigger --action=add
 
 boot.bin:
-	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc2/$@
+
+rescue.bin:
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc2/$@
+
+rootfs.tar.zstd:
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc2/$@
+
+rootfs.tar.xz:
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc2/$@
 
 $(BITFILE).bit:
-	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc2/$@
 
 clean: cleanrelease cleandisk
 
