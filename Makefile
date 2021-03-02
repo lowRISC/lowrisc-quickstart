@@ -113,13 +113,13 @@ debug: riscv-openocd/STAMP.openocd ./distrib/bin/openocd /etc/udev/rules.d/52-xi
 	sudo udevadm trigger --action=add
 
 boot.bin:
-	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@
 
 $(BITFILE).bit:
-	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@
 
 rootfs.tar.xz:
-	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.7-rc1/$@
+	curl -L -O https://github.com/lowRISC/lowrisc-chip/releases/download/v0.6-rc4/$@
 
 clean: cleanrelease cleandisk
 
